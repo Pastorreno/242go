@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { saveAssessment, updateAiProfile, syncToSheets } from "@/lib/storage";
 import { PerplexityAttribution } from "@/components/PerplexityAttribution";
 
 // ─── Color System ────────────────────────────────────────────────────────────
@@ -183,12 +182,6 @@ function AIProfile({ answers, name, assessmentId }: { answers: Record<string, nu
   const tier = getTier(scores);
   const mindset = getMindset(scores.why);
 
-  const saveProfile = useMutation({
-    mutationFn: async (aiProfile: string) => {
-      if (!assessmentId) return;
-      return apiRequest("PATCH", `/api/assessments/${assessmentId}/profile`, { aiProfile });
-    }
-  });
 
   const generate = async () => {
     setLoading(true);
@@ -229,7 +222,7 @@ Keep the total response under 250 words. Be prophetic but grounded. Be encouragi
       const data = await res.json();
       const text = data.content?.[0]?.text || "Profile generation requires an API key configuration.";
       setProfile(text);
-      if (assessmentId) saveProfile.mutate(text);
+      if (assessmentId) updateAiProfile(assessmentId, text);
     } catch {
       setProfile("Profile generation is available when connected to your AI backend. Your assessment scores have been saved to the pastoral dashboard.");
     }
@@ -294,33 +287,33 @@ export default function AssessmentPage() {
   const answeredQuestions = Object.keys(answers).length;
   const progress = (answeredQuestions / totalQuestions) * 100;
 
-  const submitMutation = useMutation({
-    mutationFn: async (finalAnswers: Record<string, number>) => {
-      const scores: Record<string, number> = {};
-      sections.forEach(s => { scores[s.key] = getSectionScore(finalAnswers, s); });
-      const disc = getDiscProfile(finalAnswers);
-      const tier = getTier(scores);
-      const composite = Object.values(scores).reduce((a, b) => a + b, 0) / Object.values(scores).length;
-      const risk = getRisk(composite);
-      return apiRequest("POST", "/api/assessments", {
-        name, email,
-        churchName: "Jesus Generation",
-        answers: JSON.stringify(finalAnswers),
-        discProfile: disc,
-        tier: tier.tier,
-        tierName: tier.name,
-        whoScore: scores.who,
-        whereScore: scores.where,
-        carryScore: scores.carry,
-        matureScore: scores.mature,
-        whyScore: scores.why,
-        compositeScore: composite,
-        riskLevel: risk.label,
-        submittedAt: new Date().toISOString(),
-      });
-    },
-    onSuccess: (data: any) => { setAssessmentId(data.id); }
-  });
+  const submitAssessment = (finalAnswers: Record<string, number>) => {
+    const scores: Record<string, number> = {};
+    sections.forEach(s => { scores[s.key] = getSectionScore(finalAnswers, s); });
+    const disc = getDiscProfile(finalAnswers);
+    const tier = getTier(scores);
+    const composite = Object.values(scores).reduce((a, b) => a + b, 0) / Object.values(scores).length;
+    const risk = getRisk(composite);
+    const record = saveAssessment({
+      name, email,
+      churchName: "Jesus Generation",
+      discProfile: disc,
+      tier: tier.tier,
+      tierName: tier.name,
+      whoScore: scores.who,
+      whereScore: scores.where,
+      carryScore: scores.carry,
+      matureScore: scores.mature,
+      whyScore: scores.why,
+      compositeScore: composite,
+      riskLevel: risk.label,
+      submittedAt: new Date().toISOString(),
+    });
+    setAssessmentId(record.id);
+    // Optional: sync to Google Sheets if URL is configured
+    const sheetsUrl = (window as any).__242GO_SHEETS_URL__;
+    if (sheetsUrl) syncToSheets(record, sheetsUrl);
+  };
 
   const handleAnswer = (idx: number) => {
     const newAnswers = { ...answers, [question.id]: idx };
@@ -333,7 +326,7 @@ export default function AssessmentPage() {
         setCurrentQuestion(0);
         setScreen("section-intro");
       } else {
-        submitMutation.mutate(newAnswers);
+        submitAssessment(newAnswers);
         setScreen("results");
       }
     }, 300);

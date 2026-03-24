@@ -1,13 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import type { Assessment } from "@shared/schema";
+import { useState, useEffect } from "react";
+import { getAssessments, type AssessmentRecord } from "@/lib/storage";
 import { PerplexityAttribution } from "@/components/PerplexityAttribution";
 
 const C = {
   bg: "#07111f", surface: "#0f1e33", card: "#152540",
   gold: "#d4af37", border: "rgba(212,175,55,0.2)",
   text: "#e8f0f8", muted: "#7a90a8",
-  green: "#4caf82", yellow: "#e8b84b", red: "#e05c5c",
+  green: "#4caf82", yellow: "#e8b84b", red: "#e05c5c", blue: "#5b8dd9",
 };
 
 function RiskBadge({ level }: { level: string }) {
@@ -30,32 +29,47 @@ function ScoreBar({ score, color }: { score: number; color: string }) {
 }
 
 const tierColors: Record<number, string> = {
-  5: C.gold, 4: "#c77dff", 3: C.green, 2: "#5b8dd9", 1: C.yellow, 0: C.muted,
+  5: C.gold, 4: "#c77dff", 3: C.green, 2: C.blue, 1: C.yellow, 0: C.muted,
 };
 
 export default function DashboardPage() {
-  const { data: assessments, isLoading } = useQuery<Assessment[]>({
-    queryKey: ["/api/assessments"],
-    queryFn: () => apiRequest("GET", "/api/assessments"),
-  });
+  const [assessments, setAssessments] = useState<AssessmentRecord[]>([]);
+  const [sheetsUrl, setSheetsUrl] = useState("");
+  const [sheetsConnected, setSheetsConnected] = useState(false);
 
-  const total = assessments?.length ?? 0;
-  const greens = assessments?.filter(a => a.riskLevel === "Green").length ?? 0;
-  const yellows = assessments?.filter(a => a.riskLevel === "Yellow").length ?? 0;
-  const reds = assessments?.filter(a => a.riskLevel === "Red").length ?? 0;
+  // Poll for new assessments every 3 seconds
+  useEffect(() => {
+    const refresh = () => setAssessments(getAssessments());
+    refresh();
+    const interval = setInterval(refresh, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const total = assessments.length;
+  const greens = assessments.filter(a => a.riskLevel === "Green").length;
+  const yellows = assessments.filter(a => a.riskLevel === "Yellow").length;
+  const reds = assessments.filter(a => a.riskLevel === "Red").length;
   const avgComposite = total > 0
-    ? Math.round(assessments!.reduce((s, a) => s + a.compositeScore, 0) / total)
+    ? Math.round(assessments.reduce((s, a) => s + a.compositeScore, 0) / total)
     : 0;
 
   const discCounts: Record<string, number> = {};
-  assessments?.forEach(a => { discCounts[a.discProfile] = (discCounts[a.discProfile] ?? 0) + 1; });
+  assessments.forEach(a => { discCounts[a.discProfile] = (discCounts[a.discProfile] ?? 0) + 1; });
   const tierCounts: Record<number, number> = {};
-  assessments?.forEach(a => { tierCounts[a.tier] = (tierCounts[a.tier] ?? 0) + 1; });
+  assessments.forEach(a => { tierCounts[a.tier] = (tierCounts[a.tier] ?? 0) + 1; });
+
+  const handleConnectSheets = () => {
+    if (sheetsUrl.includes("script.google.com")) {
+      (window as any).__242GO_SHEETS_URL__ = sheetsUrl;
+      setSheetsConnected(true);
+    }
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif", padding: 24 }}>
-      {/* Header */}
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+
+        {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, paddingTop: 16 }}>
           <div>
             <div style={{ fontSize: 11, color: C.muted, letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>
@@ -71,28 +85,26 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Row */}
-        {!isLoading && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 32 }}>
-            {[
-              { label: "Total Members", value: total, color: C.gold },
-              { label: "Promote (Green)", value: greens, color: C.green },
-              { label: "Develop (Yellow)", value: yellows, color: C.yellow },
-              { label: "Intervene (Red)", value: reds, color: C.red },
-              { label: "Avg Score", value: `${avgComposite}%`, color: C.gold },
-            ].map(({ label, value, color }, i) => (
-              <div key={i} data-testid={`stat-${label.toLowerCase().replace(/\s+/g, '-')}`} style={{
-                background: C.card, border: `1px solid ${C.border}`,
-                borderRadius: 12, padding: 20, textAlign: "center",
-              }}>
-                <div style={{ fontSize: 28, fontWeight: 900, color }}>{value}</div>
-                <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 1, marginTop: 4 }}>{label}</div>
-              </div>
-            ))}
-          </div>
-        )}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 32 }}>
+          {[
+            { label: "Total Members", value: total, color: C.gold },
+            { label: "Promote (Green)", value: greens, color: C.green },
+            { label: "Develop (Yellow)", value: yellows, color: C.yellow },
+            { label: "Intervene (Red)", value: reds, color: C.red },
+            { label: "Avg Score", value: total > 0 ? `${avgComposite}%` : "—", color: C.gold },
+          ].map(({ label, value, color }, i) => (
+            <div key={i} style={{
+              background: C.card, border: `1px solid ${C.border}`,
+              borderRadius: 12, padding: 20, textAlign: "center",
+            }}>
+              <div style={{ fontSize: 28, fontWeight: 900, color }}>{value}</div>
+              <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 1, marginTop: 4 }}>{label}</div>
+            </div>
+          ))}
+        </div>
 
-        {/* DISC Breakdown */}
-        {!isLoading && total > 0 && (
+        {/* DISC + Tier breakdown — only show if there's data */}
+        {total > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 32 }}>
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
               <div style={{ fontSize: 12, color: C.gold, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 16 }}>DISC Breakdown</div>
@@ -136,20 +148,18 @@ export default function DashboardPage() {
 
         {/* Member Table */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 32 }}>
-          <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}` }}>
             <div style={{ fontSize: 13, color: C.gold, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
               Member Pipeline ({total})
             </div>
           </div>
 
-          {isLoading ? (
-            <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading assessments...</div>
-          ) : total === 0 ? (
+          {total === 0 ? (
             <div style={{ padding: 48, textAlign: "center" }}>
               <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
-              <div style={{ color: C.gold, fontWeight: 700, marginBottom: 8 }}>No assessments yet</div>
+              <div style={{ color: C.gold, fontWeight: 700, marginBottom: 8 }}>No assessments yet this session</div>
               <div style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>
-                Share the assessment link with your members to get started.
+                Share the assessment link with your members. Results appear here in real time.
               </div>
               <a href="/#/" style={{
                 background: C.gold, color: C.bg, padding: "10px 24px",
@@ -161,17 +171,17 @@ export default function DashboardPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                    {["Name", "DISC", "Tier", "WHO", "FAT", "3T's", "3C's", "WHY", "Composite", "Status", "Date"].map(h => (
+                    {["Name", "DISC", "Tier", "WHO", "FAT", "3T's", "3C's", "WHY", "Score", "Status", "Date"].map(h => (
                       <th key={h} style={{ padding: "12px 16px", textAlign: "left", color: C.muted, fontWeight: 600, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {assessments!.map((a, i) => {
+                  {assessments.map((a, i) => {
                     const composite = Math.round(a.compositeScore);
                     const riskColor = a.riskLevel === "Green" ? C.green : a.riskLevel === "Yellow" ? C.yellow : C.red;
                     return (
-                      <tr key={a.id} data-testid={`row-member-${a.id}`} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? "transparent" : C.bg + "40" }}>
+                      <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? "transparent" : C.bg + "40" }}>
                         <td style={{ padding: "14px 16px", color: C.text, fontWeight: 600 }}>
                           <div>{a.name}</div>
                           <div style={{ color: C.muted, fontSize: 11 }}>{a.email}</div>
@@ -200,31 +210,37 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Google Sheets Setup Card */}
+        {/* Google Sheets Connect */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24, marginBottom: 32 }}>
-          <div style={{ fontSize: 12, color: C.gold, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 16 }}>
-            🔗 Connect to Google Sheets (Optional)
+          <div style={{ fontSize: 12, color: C.gold, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>
+            {sheetsConnected ? "✓ Google Sheets Connected" : "🔗 Connect to Google Sheets (Persistent Storage)"}
           </div>
-          <div style={{ color: C.muted, fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}>
-            To mirror assessment data to Google Sheets automatically, deploy the Apps Script backend and add your Web App URL below. This enables Looker Studio dashboards and Telegram notifications.
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
-            <input
-              data-testid="input-sheets-url"
-              placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
-              style={{
-                padding: "12px 16px", background: C.bg, border: `1px solid ${C.border}`,
-                borderRadius: 8, color: C.text, fontFamily: "inherit", fontSize: 13,
-              }}
-            />
-            <button style={{
-              background: C.gold, color: C.bg, border: "none", borderRadius: 8,
-              padding: "12px 20px", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-            }}>Connect</button>
-          </div>
-          <div style={{ marginTop: 12, fontSize: 12, color: C.muted }}>
-            See the Apps Script setup guide in your deployment package for step-by-step instructions.
-          </div>
+          {!sheetsConnected ? (
+            <>
+              <div style={{ color: C.muted, fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}>
+                Connect your Apps Script Web App URL to automatically save every assessment to Google Sheets — so results persist between sessions and are accessible anywhere.
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
+                <input
+                  value={sheetsUrl}
+                  onChange={e => setSheetsUrl(e.target.value)}
+                  placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
+                  style={{
+                    padding: "12px 16px", background: C.bg, border: `1px solid ${C.border}`,
+                    borderRadius: 8, color: C.text, fontFamily: "inherit", fontSize: 13,
+                  }}
+                />
+                <button onClick={handleConnectSheets} style={{
+                  background: C.gold, color: C.bg, border: "none", borderRadius: 8,
+                  padding: "12px 20px", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                }}>Connect</button>
+              </div>
+            </>
+          ) : (
+            <div style={{ color: C.green, fontSize: 14 }}>
+              All new assessments will automatically sync to your Google Sheet.
+            </div>
+          )}
         </div>
 
         <PerplexityAttribution />
@@ -232,5 +248,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
