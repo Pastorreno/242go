@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 242Go — Deep Navy / Gold Kingdom Theme */
+/* Always dark — this app uses a single dark mode */
+:root {
+  --button-outline: rgba(255,255,255, .10);
+  --badge-outline: rgba(255,255,255, .05);
+  --opaque-button-border-intensity: 9;
+  --elevate-1: rgba(255,255,255, .04);
+  --elevate-2: rgba(255,255,255, .09);
+
+  /* Deep navy background system */
+  --background: 214 64% 8%;       /* #07111f */
+  --foreground: 210 40% 92%;      /* #e8f0f8 */
+  --border: 43 55% 30% / 0.25;
+  --card: 215 58% 16%;            /* #152540 */
+  --card-foreground: 210 40% 92%;
+  --card-border: 43 55% 30% / 0.2;
+  --sidebar: 215 60% 14%;
+  --sidebar-foreground: 210 40% 92%;
+  --sidebar-border: 43 55% 30% / 0.2;
+  --sidebar-primary: 43 55% 52%;   /* gold */
+  --sidebar-primary-foreground: 214 64% 8%;
+  --sidebar-accent: 215 60% 20%;
+  --sidebar-accent-foreground: 210 40% 92%;
+  --sidebar-ring: 43 55% 52%;
+  --popover: 215 60% 12%;
+  --popover-foreground: 210 40% 92%;
+  --popover-border: 43 55% 30% / 0.2;
+  --primary: 43 55% 52%;           /* #d4af37 gold */
+  --primary-foreground: 214 64% 8%;
+  --secondary: 215 55% 20%;
+  --secondary-foreground: 210 40% 92%;
+  --muted: 215 55% 18%;
+  --muted-foreground: 210 20% 55%; /* #7a90a8 */
+  --accent: 215 55% 20%;
+  --accent-foreground: 210 40% 92%;
+  --destructive: 0 70% 55%;
+  --destructive-foreground: 0 0% 98%;
+  --input: 215 45% 25%;
+  --ring: 43 55% 52%;
+  --chart-1: 43 55% 52%;
+  --chart-2: 148 55% 50%;
+  --chart-3: 35 80% 58%;
+  --chart-4: 220 60% 55%;
+  --chart-5: 280 55% 60%;
+  --font-sans: 'Inter', sans-serif;
+  --font-serif: 'Georgia', serif;
+  --font-mono: 'Menlo', monospace;
+  --radius: .75rem;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow: 0 2px 8px rgba(0,0,0,0.5);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-accent-border: hsl(var(--sidebar-accent));
+  --primary-border: hsl(var(--primary));
+  --secondary-border: hsl(var(--secondary));
+  --muted-border: hsl(var(--muted));
+  --accent-border: hsl(var(--accent));
+  --destructive-border: hsl(var(--destructive));
+}
+
+/* Force dark everywhere */
+html { color-scheme: dark; }
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    min-height: 100vh;
+  }
+}
+
+/* Custom 242Go Animations */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in-up { animation: fade-in-up 0.5s ease forwards; }
+.animate-slide-in { animation: slide-in-right 0.3s ease forwards; }
+
+/* Gold text utility */
+.text-gold { color: hsl(43 55% 52%); }
+.bg-gold { background-color: hsl(43 55% 52%); }
+.border-gold { border-color: hsl(43 55% 52% / 0.3); }
+
+/* Option button hover */
+.option-btn { transition: all 0.2s ease; }
+.option-btn:hover {
+  border-color: hsl(43 55% 52% / 0.5) !important;
+  background: hsl(43 55% 52% / 0.08) !important;
+  transform: translateX(3px);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: hsl(214 64% 8%); }
+::-webkit-scrollbar-thumb { background: hsl(215 40% 30%); border-radius: 4px; }
+
+@layer utilities {
+  input[type="search"]::-webkit-search-cancel-button { @apply hidden; }
+  .no-default-hover-elevate {}
+  .no-default-active-elevate {}
+  .toggle-elevate::before, .toggle-elevate-2::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0px;
+    border-radius: inherit;
+    z-index: -1;
+  }
+  .toggle-elevate.toggle-elevated::before { background-color: var(--elevate-2); }
+  .border.toggle-elevate::before { inset: -1px; }
+  .hover-elevate:not(.no-default-hover-elevate)::after,
+  .active-elevate:not(.no-default-active-elevate)::after,
+  .hover-elevate-2:not(.no-default-hover-elevate)::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0px;
+    border-radius: inherit;
+    z-index: 0;
+  }
+  .hover-elevate:not(.no-default-hover-elevate):hover::after { background-color: var(--elevate-1); }
+  .hover-elevate-2:not(.no-default-hover-elevate):hover::after { background-color: var(--elevate-2); }
+  .active-elevate:not(.no-default-active-elevate):active::after { background-color: var(--elevate-2); }
+}
